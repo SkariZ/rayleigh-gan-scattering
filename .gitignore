@@ -52,3 +52,6 @@ matplotlibrc
 *.pdf
 *.svg
 
+# Make exceptions here as needed
+!docs/screenshot.png
+
