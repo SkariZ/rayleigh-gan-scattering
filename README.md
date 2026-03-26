@@ -2,19 +2,37 @@
 
 ![Rayleigh-Gans scattering viewer](docs/screenshot.png)
 
-Interactive tools for exploring analytic form factors in the Rayleigh-Gans regime.
-The repository combines:
+An interactive sandbox for exploring how Rayleigh-Gans form factors change with
+geometry, size, wavelength, and scattering vector.
+
+It is meant for quick physical intuition:
 
 - A PyQt5 desktop viewer for quick visual comparisons
-- Reusable analytic form-factor functions in `src/rayleigh_gans/form_factors.py`
-- Jupyter notebooks for derivations, examples, and reproducible figures
+- Reusable form-factor functions in `src/rayleigh_gans/form_factors.py`
+- Notebooks for derivations, examples, and reproducible figures
+
+## What You Can Explore
+
+- How minima, oscillations, and envelope shape shift as particle size changes
+- How different geometries compare at the same `q` or scattering angle
+- When shell thickness starts to matter
+- How particle models differ from Debye and Guinier polymer descriptions
+
+## Quick start
+
+```bash
+pip install -e .
+rayleigh-gans-viewer
+```
+
+You can also launch the app with `python run_app.py` or `python -m rayleigh_gans`.
 
 ## Features
 
-- Compare multiple geometries in the same plot
-- Switch between plotting versus scattering angle `theta` or scattering vector `q`
-- Inspect amplitude views `Re[F(q)]`, `|F(q)|`, and intensity `|F(q)|^2`
-- Explore both particle and polymer models from the same interface
+- Compare multiple geometries on the same plot
+- Switch between scattering angle `theta` and scattering vector `q`
+- Inspect `Re[F(q)]`, `|F(q)|`, and intensity `|F(q)|^2`
+- Mix particle and polymer models in the same viewer
 - Export figures directly to PNG
 
 ## Implemented models
@@ -28,43 +46,13 @@ The repository combines:
 
 ## Installation
 
-### Option 1: Install as a package
+For the app:
 
 ```bash
 pip install -e .
 ```
 
-This installs the `rayleigh_gans` package and the console script:
-
-```bash
-rayleigh-gans-viewer
-```
-
-You can also launch it with:
-
-```bash
-python -m rayleigh_gans
-```
-
-### Option 2: Install from requirements
-
-```bash
-pip install -r requirements.txt
-```
-
-This is enough to run the current app launcher:
-
-```bash
-python run_app.py
-```
-
-### Development / notebooks
-
-```bash
-pip install -r requirements-dev.txt
-```
-
-or:
+For notebooks as well:
 
 ```bash
 pip install -e .[dev]
@@ -72,12 +60,6 @@ pip install -e .[dev]
 
 ## Running the viewer
 
-From the repository root, choose one of:
-
-```bash
-python run_app.py
-```
-
 ```bash
 python -m rayleigh_gans
 ```
@@ -86,18 +68,14 @@ python -m rayleigh_gans
 rayleigh-gans-viewer
 ```
 
-## Running the tests
+```bash
+python run_app.py
+```
 
-The current test suite uses the standard library `unittest` framework:
+## Running the tests
 
 ```bash
 python -m unittest discover -s tests -v
-```
-
-To run the form-factor tests directly:
-
-```bash
-python -m unittest tests.test_form_factors -v
 ```
 
 ## Notebook usage
@@ -118,17 +96,12 @@ while still keeping the package layout clean.
 
 ```text
 .
-|-- docs/
-|-- Notebooks/
-|-- src/
-|   `-- rayleigh_gans/
-|       |-- app/
-|       |-- form_factors.py
-|       `-- main.py
-|-- tests/
-|-- pyproject.toml
-|-- requirements.txt
-`-- run_app.py
+|- docs/
+|- Notebooks/
+|- src/rayleigh_gans/
+|- tests/
+|- pyproject.toml
+`- run_app.py
 ```
 
 ## Possible next extensions
