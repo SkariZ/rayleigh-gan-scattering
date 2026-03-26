@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rayleigh-gans-scattering"
+version = "0.1.0"
+description = "Interactive visualization tools and analytic form factors for Rayleigh-Gans scattering."
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+  "matplotlib>=3.8",
+  "numpy>=1.26",
+  "PyQt5>=5.15",
+  "scipy>=1.13",
+]
+
+[project.optional-dependencies]
+dev = [
+  "ipykernel>=6.29",
+  "jupyterlab>=4.0",
+]
+
+[project.scripts]
+rayleigh-gans-viewer = "rayleigh_gans.main:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]

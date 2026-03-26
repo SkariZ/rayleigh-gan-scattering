@@ -92,17 +92,6 @@ GEOM_HELP = {
         "Validity: typically q*Rg ≲ 1"
     ),
 }
-
-
-def normalize_curve(y: np.ndarray) -> np.ndarray:
-    """Normalize for visualization: y / max(|y|)."""
-    y = np.asarray(y, dtype=float)
-    m = np.nanmax(np.abs(y))
-    if not np.isfinite(m) or m <= 0:
-        return y
-    return y / m
-
-
 # ----------------------------
 # Main window
 # ----------------------------
@@ -112,6 +101,7 @@ class MainWindow(QtWidgets.QMainWindow):
         super().__init__()
         self.setWindowTitle("Rayleigh–Gans Scattering Viewer (PyQt5)")
         self.resize(1150, 680)
+        self.statusBar()
 
         central = QtWidgets.QWidget()
         self.setCentralWidget(central)
@@ -253,6 +243,10 @@ class MainWindow(QtWidgets.QMainWindow):
                 w.stateChanged.connect(self.update_plot)
 
         # init help
+        self.xmode.currentIndexChanged.connect(self._sync_control_state)
+        self.radius.valueChanged.connect(self._enforce_shell_constraints)
+        self._enforce_shell_constraints()
+        self._sync_control_state()
         self._update_help_text()
 
         # initial draw
@@ -354,6 +348,23 @@ class MainWindow(QtWidgets.QMainWindow):
         nm = float(self.nm.value()) / 100.0
         return R, Rg, dR, lam, nm
 
+    def _sync_control_state(self):
+        plotting_theta = self.xmode.currentText().startswith("theta")
+        for widget in (self.theta_min, self.theta_max, self.theta_n):
+            widget.setEnabled(plotting_theta)
+        for widget in (self.q_min, self.q_max):
+            widget.setEnabled(not plotting_theta)
+        self.logx.setEnabled(not plotting_theta)
+        if plotting_theta and self.logx.isChecked():
+            self.logx.setChecked(False)
+
+    def _enforce_shell_constraints(self):
+        max_thickness = max(1, self.radius.value())
+        if self.shell_thickness.maximum() != max_thickness:
+            self.shell_thickness.setMaximum(max_thickness)
+        if self.shell_thickness.value() > max_thickness:
+            self.shell_thickness.setValue(max_thickness)
+
     def _make_x(self, lam, nm):
         N = int(self.theta_n.value())
 
@@ -364,14 +375,22 @@ class MainWindow(QtWidgets.QMainWindow):
                 tmax = tmin + 0.01
             theta = np.linspace(tmin, tmax, N)
             q = q_from_theta(theta, nm, lam)
-            return theta, q, "theta [rad]"
+            return theta, q, "theta [rad]", None
         else:
             qmin = self.q_min.value() / 1000.0
             qmax = self.q_max.value() / 1000.0
             if qmax <= qmin:
                 qmax = qmin + 1e-3
-            q = np.linspace(qmin, qmax, N)
-            return q, q, "q [1/length]"
+            if self.logx.isChecked():
+                adjusted_qmin = max(qmin, max(qmax / 1000.0, 1e-6))
+                if adjusted_qmin >= qmax:
+                    qmax = adjusted_qmin * 10.0
+                q = np.geomspace(adjusted_qmin, qmax, N)
+                note = f"log-x requires q > 0; using q_min={adjusted_qmin:.3g}"
+            else:
+                q = np.linspace(qmin, qmax, N)
+                note = None
+            return q, q, "q [1/length]", note
 
     # ---- Core plotting
     def _compute_geom(self, geom, q, R, Rg, dR):
@@ -384,24 +403,24 @@ class MainWindow(QtWidgets.QMainWindow):
         """
         if geom == "Sphere":
             F = F_sphere_q(q, R)
-            I = np.abs(F) ** 2
+            I = P_from_F(F)
             return F, I
 
         if geom == "Thin spherical shell":
             F = F_thin_spherical_shell_q(q, R)
-            I = np.abs(F) ** 2
+            I = P_from_F(F)
             return F, I
 
         if geom == "Thick spherical shell":
             r_in = max(1e-9, R - dR)
             r_out = R
             F = F_thick_spherical_shell_q(q, r_in, r_out)
-            I = np.abs(F) ** 2
+            I = P_from_F(F)
             return F, I
 
         if geom == "Disk":
             F = F_disk_q(q, R)  # quick-look: q_perp ≈ q
-            I = np.abs(F) ** 2
+            I = P_from_F(F)
             return F, I
 
         if geom == "Gaussian coil (Debye)":
@@ -416,6 +435,7 @@ class MainWindow(QtWidgets.QMainWindow):
         geoms = self.selected_geometries()
         ax = self.canvas.ax
         ax.clear()
+        self.statusBar().clearMessage()
 
         if not geoms:
             ax.set_title("No geometry selected")
@@ -423,26 +443,30 @@ class MainWindow(QtWidgets.QMainWindow):
             return
 
         R, Rg, dR, lam, nm = self._get_params()
-        x, q, xlabel = self._make_x(lam, nm)
+        x, q, xlabel, x_note = self._make_x(lam, nm)
 
         ymode = self.ytype.currentText()
 
         plotted_any = False
+        skipped_geometries = []
         for geom in geoms:
             F, I = self._compute_geom(geom, q, R, Rg, dR)
 
             if ymode == "Re[F(q)]":
                 if F is None:
+                    skipped_geometries.append(geom)
                     continue
                 y = np.real(F)
 
             elif ymode == "|F(q)|":
                 if F is None:
+                    skipped_geometries.append(geom)
                     continue
                 y = np.abs(F)
 
             elif ymode == "|F(q)|²":
                 if I is None:
+                    skipped_geometries.append(geom)
                     continue
                 y = np.asarray(I, dtype=float)
 
@@ -475,6 +499,16 @@ class MainWindow(QtWidgets.QMainWindow):
         ax.set_title(f"λ={lam:g}, n={nm:.3g}, R={R:g}, Rg={Rg:g}, ΔR={dR:g}")
         ax.grid(True, alpha=0.25)
         ax.legend(loc="best", fontsize=10)
+        messages = []
+        if x_note:
+            messages.append(x_note)
+        if skipped_geometries:
+            messages.append(
+                "Skipped intensity-only models for amplitude view: "
+                + ", ".join(skipped_geometries)
+            )
+        if messages:
+            self.statusBar().showMessage(" | ".join(messages))
         self.canvas.draw()
 
 
